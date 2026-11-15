@@ -56,6 +56,7 @@ class VoiceGuide(context: Context) {
 
     /** Returns false if the cue could not be handed to the engine (screen-only fallback). */
     fun speak(text: String): Boolean {
+        Log.i("AnulVoice", "speak: $text")   // the demo recorder lines the narration up with these
         val sdk = tts ?: return false
         if (_state.value.status == VoiceStatus.UNAVAILABLE || _state.value.status == VoiceStatus.STARTING) return false
         return runCatching { sdk.speak(text) }.isSuccess
