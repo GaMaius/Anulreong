@@ -25,17 +25,23 @@ $hb = Start-Job { for ($i = 0; $i -lt 900; $i++) { try { Invoke-WebRequest -UseB
 & $adb -s emulator-5554 shell am start --user current -n "$pkg/.MainActivity" 2>$null | Out-Null
 # Connecting NaviHelper brings the navigation app to the front once; wait for that, then make
 # sure the app is back on top and stays there for 12 s before capturing.
+function Front { & $adb -s emulator-5554 shell am start --user current -n "$pkg/.MainActivity" 2>$null | Out-Null }
 function TopIsApp { ((& $adb -s emulator-5554 shell "dumpsys activity activities" 2>$null) -join "`n") -match ('topResumedActivity=\S+ \S+ ' + [regex]::Escape($pkg)) }
 for ($i = 0; $i -lt 25; $i++) { Start-Sleep 3; if (-not (TopIsApp)) { Write-Output "navi took the foreground after $($i*3)s"; break } }
 Start-Sleep 6
 # Make sure the navigation really guides to 서울역 before recording: the first route request after
 # boot is often dropped, so repeat it until the navi engine logs guidance updates.
-$routed = $false
+function LastNaviMode { & $adb -s emulator-5554 logcat -c 2>$null; Start-Sleep 7; ([regex]::Matches(((& $adb -s emulator-5554 logcat -d -s NavigationUseCase 2>$null) -join "`n"), 'NaviMode\.\w+') | Select-Object -Last 1).Value }
+$mode = LastNaviMode; Write-Output "navi mode before warm-up: $mode"
+$routed = $mode -and $mode -ne 'NaviMode.SafeGuiding'     # already guiding: never re-request (that resets the route)
 for ($r = 0; $r -lt 5 -and -not $routed; $r++) {
     & $adb -s emulator-5554 logcat -c 2>$null
     & $adb -s emulator-5554 shell am start --user current -n "$pkg/.MainActivity" 2>$null | Out-Null; Start-Sleep 3
     Tap 908 410; Start-Sleep 2; Tap 2222 452; Start-Sleep 25
-    $routed = ((& $adb -s emulator-5554 logcat -d 2>$null) -join "`n") -match 'guidance_svc'
+    # SafeGuiding = free driving without a route; anything else (route / simulation guiding) means a real route
+    $modes = ((& $adb -s emulator-5554 logcat -d -s NavigationUseCase 2>$null) -join "`n")
+    $routed = $modes -match 'NaviMode\.(?!SafeGuiding)\w+'
+    if ($routed) { Write-Output ([regex]::Matches($modes, 'NaviMode\.\w+') | Select-Object -Last 1).Value }
     Write-Output "route request $($r + 1): guiding=$routed"
 }
 if (-not $routed) { Stop-Job $hb; Remove-Job $hb; throw 'navigation did not start guiding' }
@@ -51,13 +57,15 @@ for ($i = 0; $i -lt 8 -and -not $stable; $i++) {
     if ($stable -and (Get-Item $probe).Length -lt 300kb) { Write-Output 'screen still blank, waiting'; $stable = $false; Start-Sleep 15 }
     Remove-Item $probe -ErrorAction SilentlyContinue
 }
-if (-not $stable) { Stop-Job $hb; Remove-Job $hb; throw 'app did not stay in front' }
+if (-not $stable) { Write-Output 'warning: app did not stay in front, recording anyway' }
 Tap 908 180; Start-Sleep 2
 
 $hostMs = [int64]([DateTime]::UtcNow - [DateTime]'1970-01-01').TotalMilliseconds
 $devOff = [int64](& $adb -s emulator-5554 shell date +%s%3N) - $hostMs
 $start = [DateTime]::UtcNow.AddSeconds(4)
 $startMs = [int64]($start - [DateTime]'1970-01-01').TotalMilliseconds
+$voiceLog = Join-Path $frames 'voice.txt'
+$vlog = Start-Job -ArgumentList $adb, $voiceLog -ScriptBlock { param($adb, $out) cmd /c "`"$adb`" -s emulator-5554 logcat -T 1 -v epoch -s AnulVoice:I > `"$out`"" }
 $cap = Start-Job -ArgumentList $adb, $frames, $start -ScriptBlock { param($adb, $frames, $start)
     while ([DateTime]::UtcNow -lt $start) { Start-Sleep -Milliseconds 20 }
     while ($true) {
@@ -68,22 +76,20 @@ $cap = Start-Job -ArgumentList $adb, $frames, $start -ScriptBlock { param($adb, 
 }
 while ([DateTime]::UtcNow -lt $start) { Start-Sleep -Milliseconds 20 }
 $script:clock = [Diagnostics.Stopwatch]::StartNew()
-# -- Part 1: real Pleos navigation (stationary emulator; the car panel and climate bar stay visible)
-At 3;    Tap 908 410       # 설정 탭
-At 6;    Tap 2222 452      # 서울역 안내 -> NaviHelper.requestRoute
-At 10;   Tap 1154 1370     # 내비 화면: 실제 길 안내
-At 22;   Tap 1520 1370     # 안울렁으로 돌아오기
-At 23.5; Tap 908 180       # 여정 탭: 내비와 같은 TBT, 남은 시간
-At 30;   Tap 2359 330      # 멀미 나요 (실제 위치에 기록)
-At 34;   Tap 1693 1165     # 바람 넣기 -> 외기, 창문, 송풍, 온도
-At 35.5; Tap 1693 1165
-At 52;   Tap 1693 1240     # 원래대로 돌리기
-At 64;   Tap 1636 932      # 멀미가 덜 나는 길 찾기 -> changeRouteOption(COMFORTABLE)
-At 76;   Tap 1154 1370     # 내비가 다시 찾은 경로
-At 88;   Tap 1520 1370     # 안울렁
-At 89.5; Tap 908 410       # 설정 탭
+# -- Part 1: real Pleos navigation (route was started once before recording; never re-requested)
+At 2;    Tap 1154 1370     # 내비 화면: 서울역 길 안내 중
+At 12;   Front             # 안울렁으로 돌아오기
+At 13.5; Tap 908 180       # 여정 탭: 내비와 같은 TBT, 남은 시간
+At 20;   Tap 2359 330      # 멀미 나요 (실제 위치에 기록)
+At 24;   Tap 1693 1165     # 바람 넣기 -> 외기, 창문, 송풍, 온도
+At 25.5; Tap 1693 1165
+At 42;   Tap 1693 1240     # 원래대로 돌리기
+At 54;   Tap 1636 932      # 멀미가 덜 나는 길 찾기 -> changeRouteOption(COMFORTABLE)
+At 66;   Tap 1154 1370     # 내비가 다시 찾은 경로
+At 76;   Front             # 안울렁
+At 77.5; Tap 908 410       # 설정 탭
 # -- Part 2: 시연 모드 (synthetic road, 3 trips)
-$D = 92
+$D = 80
 At $D;   Tap 2272 348      # 시연 모드 켜기 -> 시연 시작
 At ($D + 1.5); Tap 908 180 # 여정 탭
 At ($D + 31); Tap 2359 330      # 멀미 나요 (just after the roundabout)
@@ -103,7 +109,7 @@ At ($D + 180)
 New-Item -ItemType File "$frames\stop" | Out-Null
 Wait-Job $cap -Timeout 20 | Out-Null; Remove-Job $cap -Force
 Stop-Job $hb; Remove-Job $hb
-cmd /c "`"$adb`" -s emulator-5554 logcat -d -v epoch -s AnulVoice:I > `"$frames\voice.txt`""   # raw UTF-8 bytes
+Get-CimInstance Win32_Process -Filter "Name='adb.exe'" | Where-Object { $_.CommandLine -match 'AnulVoice' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }; Stop-Job $vlog -ErrorAction SilentlyContinue; Remove-Job $vlog -Force -ErrorAction SilentlyContinue
 $wav = Join-Path $frames 'narration.wav'
 python (Join-Path $PSScriptRoot 'narrate.py') (Join-Path $frames 'voice.txt') $startMs $devOff 300 $wav
 
