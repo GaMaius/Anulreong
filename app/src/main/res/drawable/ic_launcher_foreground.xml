@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A calm face above a winding road -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M54,28a20,20 0,1 1,0 40a20,20 0,1 1,0 -40z" />
+    <path android:fillColor="#1B2A4A"
+        android:pathData="M46,44a2.5,2.5 0,1 1,0 5a2.5,2.5 0,1 1,0 -5zM62,44a2.5,2.5 0,1 1,0 5a2.5,2.5 0,1 1,0 -5z" />
+    <path android:strokeColor="#F2557E" android:strokeWidth="2.6" android:strokeLineCap="round"
+        android:pathData="M46,55q8,6 16,0" />
+    <path android:strokeColor="#FFB81C" android:strokeWidth="4.5" android:strokeLineCap="round"
+        android:pathData="M28,80q13,-8 26,0t26,0" />
+</vector>
