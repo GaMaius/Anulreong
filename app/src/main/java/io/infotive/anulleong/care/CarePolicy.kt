@@ -22,7 +22,7 @@ class CuePolicy(
         if (nowMs - lastAnyMs < minGapMs) return null
         val candidate = events.firstOrNull { e ->
             val d = e.distanceM ?: return@firstOrNull false
-            d in 0..announceWithinM && e.kind != EventKind.ARRIVE && e.kind != EventKind.PAST_SICK &&
+            d in 0..(if (e.similarRisk) announceWithinM + 200 else announceWithinM) && e.kind != EventKind.ARRIVE && e.kind != EventKind.PAST_SICK &&
                 nowMs - (lastByKey[e.key] ?: Long.MIN_VALUE / 2) >= sameKeyCooldownMs
         } ?: return null
         lastAnyMs = nowMs

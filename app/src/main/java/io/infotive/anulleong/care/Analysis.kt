@@ -56,8 +56,11 @@ object ZoneAnalysis {
 }
 
 /**
- * Sway profile of a route from the manoeuvres the navigation reports.
- * It compares routes with each other; it is not a motion-sickness probability.
+ * 속편한 점수 (0–100, higher = calmer) for comparing routes, built from the manoeuvres the
+ * navigation reports. It compares routes with each other; it is not a motion-sickness probability.
+ *
+ *   흔들림 요소 = 급회전·회전교차로×3 + 진출입로×2 + 방지턱·내리막·노면×2 + 일반 회전·갈림길×1
+ *   속편한 점수 = 100 − (흔들림 요소 ÷ 거리 km × 10) − 지난 멀미 구간×15 − 아이가 약한 유형 구간×8
  */
 data class RouteStats(
     val sharpTurns: Int,
@@ -67,18 +70,30 @@ data class RouteStats(
     /** Known sick zones on the route; null when the SDK cannot tell (see README). */
     val sickZones: Int?,
     val distanceM: Int?,
+    /** Sections of a kind this child is sensitive to (유사 구간). */
+    val similar: Int = 0,
 ) {
-    val swayScore get() = sharpTurns * 3 + ramps * 2 + bumps * 2 + turns
+    val swayPoints get() = sharpTurns * 3 + ramps * 2 + bumps * 2 + turns
+
+    val comfortScore: Int get() {
+        val km = ((distanceM ?: 10_000) / 1000.0).coerceAtLeast(1.0)
+        val s = 100 - swayPoints / km * 10 - 15 * (sickZones ?: 0) - 8 * similar
+        return Math.round(s).toInt().coerceIn(0, 100)
+    }
 
     companion object {
-        fun of(events: List<AheadEvent>, sickZones: Int?, distanceM: Int?) = RouteStats(
-            sharpTurns = events.count { it.kind == EventKind.SHARP_TURN },
-            ramps = events.count { it.kind == EventKind.RAMP },
-            turns = events.count { it.kind == EventKind.TURN || it.kind == EventKind.MERGE },
-            bumps = events.count { it.kind == EventKind.BUMP || it.kind == EventKind.DOWNHILL || it.kind == EventKind.ROUGH_ROAD },
-            sickZones = sickZones,
-            distanceM = distanceM,
-        )
+        fun of(events: List<AheadEvent>, sickZones: Int?, distanceM: Int?, flagged: Set<EventKind> = emptySet()): RouteStats {
+            val ev = events.filter { it.kind != EventKind.PAST_SICK }
+            return RouteStats(
+                sharpTurns = ev.count { it.kind == EventKind.SHARP_TURN },
+                ramps = ev.count { it.kind == EventKind.RAMP },
+                turns = ev.count { it.kind == EventKind.TURN || it.kind == EventKind.MERGE },
+                bumps = ev.count { it.kind == EventKind.BUMP || it.kind == EventKind.DOWNHILL || it.kind == EventKind.ROUGH_ROAD },
+                sickZones = sickZones,
+                distanceM = distanceM,
+                similar = ev.count { it.kind in flagged },
+            )
+        }
     }
 }
 
@@ -90,4 +105,8 @@ data class RouteCompare(
     val to: RouteStats?,
     val synthetic: Boolean,
     val note: String? = null,
+    /** Real navi only: option to return to if the family keeps the original route. */
+    val originalOption: String? = null,
+    /** Real navi only: the new route has already been applied by the navigation. */
+    val applied: Boolean = false,
 )

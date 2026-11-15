@@ -3,7 +3,7 @@ name: Feature request
 about: 기능 추가
 title: "[FEAT] "
 labels: feat
-assignees: GaMaius
+assignees: ""
 
 ---
 

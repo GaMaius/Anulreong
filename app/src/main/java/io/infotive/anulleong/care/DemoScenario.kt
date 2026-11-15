@@ -15,23 +15,25 @@ object DemoScenario {
     private data class Mark(val atM: Int, val tbt: AheadEvents.RawTbt? = null, val caution: AheadEvents.RawCaution? = null)
 
     enum class Road(val label: String, val lengthM: Int, val latOffset: Double) {
-        /** The usual road: bump, left turn, ramp, downhill, roundabout. */
+        /** The usual road: bump, roundabout, ramp, downhill, left turn. */
         USUAL("늘 가던 길", 5000, 0.0),
-        /** A parallel road ~670 m north: a little longer, fewer sharp manoeuvres. */
+        /** A parallel road ~670 m north: a little longer, fewer sway sections, one roundabout. */
         COMFORT("편안한 길", 5600, 0.006),
     }
 
     private val usual = listOf(
         Mark(600, caution = AheadEvents.RawCaution("demo-bump", "SPEED_BUMP", 0)),
-        Mark(1200, tbt = AheadEvents.RawTbt("TURN_LEFT", 0.0, "데모 좌회전")),
+        Mark(1200, tbt = AheadEvents.RawTbt("TURN_ENTER_ROUNDABOUT_03", 0.0, "데모 회전교차로")),
         Mark(2000, tbt = AheadEvents.RawTbt("TURN_ENTER_IC_R", 0.0, "데모 진입로")),
         Mark(2700, caution = AheadEvents.RawCaution("demo-downhill", "DOWNHILL_CAUTION_AREA", 0)),
-        Mark(3400, tbt = AheadEvents.RawTbt("TURN_ENTER_ROUNDABOUT_03", 0.0, "데모 회전교차로")),
+        Mark(3400, tbt = AheadEvents.RawTbt("TURN_LEFT", 0.0, "데모 좌회전")),
         Mark(4200, tbt = AheadEvents.RawTbt("TURN_RESTAREA", 0.0, "데모 휴게소")),
         Mark(5000, tbt = AheadEvents.RawTbt("TURN_ARRIVE", 0.0, "데모 도착")),
     )
     private val comfort = listOf(
         Mark(1500, tbt = AheadEvents.RawTbt("TURN_KEEP_R", 0.0, "데모 갈림길")),
+        // a roundabout on a road the family has never driven: shows 유사 구간 예측
+        Mark(2600, tbt = AheadEvents.RawTbt("TURN_ENTER_ROUNDABOUT_02", 0.0, "데모 회전교차로2")),
         Mark(3500, tbt = AheadEvents.RawTbt("TURN_RESTAREA", 0.0, "데모 휴게소")),
         Mark(5600, tbt = AheadEvents.RawTbt("TURN_ARRIVE", 0.0, "데모 도착")),
     )
@@ -72,13 +74,13 @@ object DemoScenario {
     }
 
     /** Whole-route profile, including how many of the family's demo sick zones the road passes. */
-    fun stats(road: Road, zones: List<SickZone>): RouteStats {
+    fun stats(road: Road, zones: List<SickZone>, flagged: Set<EventKind> = emptySet()): RouteStats {
         val onRoute = zones.filter { it.source == DataSource.DEMO }.count { z ->
             (0..road.lengthM step 100).any { p ->
                 val l = locAt(road, p, 0)
                 RevisitDetector.distanceM(l.lat, l.lon, z.lat, z.lon) <= ZoneAnalysis.ZONE_RADIUS_M
             }
         }
-        return RouteStats.of(events(road, 0), onRoute, road.lengthM)
+        return RouteStats.of(events(road, 0), onRoute, road.lengthM, flagged)
     }
 }

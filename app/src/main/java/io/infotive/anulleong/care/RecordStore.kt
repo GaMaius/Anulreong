@@ -37,6 +37,7 @@ class RecordStore(context: Context) {
         r.routeId?.let { put("routeId", it) }; r.steeringDeg?.let { put("steering", it.toDouble()) }
         r.brakeOn?.let { put("brake", it) }; r.gear?.let { put("gear", it) }
         r.nextEventTitle?.let { put("nextEvent", it) }
+        r.cueKind?.let { put("cueKind", it.name) }
     }
 
     private fun fromJson(o: JSONObject) = CareRecord(
@@ -50,6 +51,7 @@ class RecordStore(context: Context) {
         brakeOn = if (o.has("brake")) o.getBoolean("brake") else null,
         gear = o.optString("gear").ifEmpty { null },
         nextEventTitle = o.optString("nextEvent").ifEmpty { null },
+        cueKind = o.optString("cueKind").ifEmpty { null }?.let { k -> runCatching { EventKind.valueOf(k) }.getOrNull() },
     )
 
     private fun JSONObject.optDoubleOrNull(k: String): Double? = if (has(k)) getDouble(k) else null

@@ -11,8 +11,12 @@
     <uses-permission android:name="pleos.car.permission.CONTROL_CAR_WINDOWS" />
     <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />
     <uses-permission android:name="pleos.car.permission.READ_CAR_STEERING" />
+    <!-- Vehicle: rear seat occupancy (which side the child sits), ambient light -->
+    <uses-permission android:name="pleos.car.permission.CAR_SEATS" />
     <!-- TextToSpeech -->
     <uses-permission android:name="pleos.car.permission.TTS_SERVICE" />
+    <!-- SpeechToText: "말로 알리기" -->
+    <uses-permission android:name="pleos.car.permission.STT_SERVICE" />
 
     <application
         android:allowBackup="false"

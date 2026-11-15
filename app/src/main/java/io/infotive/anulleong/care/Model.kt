@@ -22,6 +22,8 @@ data class AheadEvent(
     val kidLine: String,
     val distanceM: Int?,
     val fromCautionPoint: Boolean,
+    /** Same kind of section as ones this child got sick around before (on any road). */
+    val similarRisk: Boolean = false,
 )
 
 data class Loc(val lat: Double, val lon: Double, val heading: Double?, val receivedAtMs: Long)
@@ -59,5 +61,7 @@ data class CareRecord(
     val steeringDeg: Float?,
     val brakeOn: Boolean?,
     val gear: String?,
+    /** The road section this record is attributed to (just passed or right ahead). */
     val nextEventTitle: String?,
+    val cueKind: EventKind? = null,
 )

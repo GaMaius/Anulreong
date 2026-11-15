@@ -23,6 +23,7 @@ object C {
     val sun = Color(0xFFFFB81C)       // 조금 불편 / notice
     val berry = Color(0xFFF2557E)     // 멀미 / strong
     val lilac = Color(0xFF8E7CF0)     // demo / past-record
+    val lilacDeep = Color(0xFF5E48D8) // past-record banners (white text needs contrast)
 }
 
 val Jua = FontFamily(Font(R.font.jua))

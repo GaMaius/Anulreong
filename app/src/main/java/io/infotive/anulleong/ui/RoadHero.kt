@@ -54,8 +54,8 @@ fun RoadHero(
     headline: String,
     sub: String?,
     modifier: Modifier = Modifier,
+    overlay: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit = {},
 ) {
-    val measurer = rememberTextMeasurer()
     val flow = rememberInfiniteTransition(label = "road")
     val phase by flow.animateFloat(0f, if (moving) 60f else 0f,
         infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Restart), label = "dash")
@@ -97,7 +97,7 @@ fun RoadHero(
                 val (p, _) = at(f)
                 val isNext = e === placed.first()
                 val r = (if (isNext) 25.dp.toPx() else 18.dp.toPx()) * (if (e.key == highlightKey) pulse else 1f)
-                sticker(p, r, eventColor(e), glyph(e), measurer, if (isNext) 27.sp.value else 19.sp.value)
+                sticker(p, r, e)
             }
             val (carP, carA) = at(carF)
             car(carP, carA + 90f)
@@ -109,16 +109,23 @@ fun RoadHero(
                 Text(sub, fontSize = 15.sp, lineHeight = 21.sp, color = C.inkSoft, fontWeight = FontWeight.Medium)
             }
         }
+        overlay()
     }
 }
 
-private fun DrawScope.sticker(c: Offset, r: Float, ring: Color, label: String,
-                              measurer: androidx.compose.ui.text.TextMeasurer, fontSp: Float) {
+private fun DrawScope.sticker(c: Offset, r: Float, e: AheadEvent) {
+    val ring = eventColor(e)
     drawCircle(Color.Black.copy(alpha = .12f), r * 1.04f, c + Offset(0f, r * 0.14f))
     drawCircle(Color.White, r, c)
-    drawCircle(ring, r, c, style = Stroke(r * 0.18f))
-    val layout = measurer.measure(label, TextStyle(fontSize = fontSp.sp, color = ring, fontWeight = FontWeight.Black))
-    drawText(layout, topLeft = Offset(c.x - layout.size.width / 2f, c.y - layout.size.height / 2f))
+    drawCircle(ring, r, c, style = Stroke(r * 0.16f))
+    drawEventIcon(e, ring, c, r * 0.62f)
+    if (e.similarRisk) {
+        // "아이가 약한 유형" badge
+        val b = c + Offset(r * 0.78f, -r * 0.78f)
+        drawCircle(C.lilac, r * 0.38f, b)
+        drawLine(Color.White, b + Offset(0f, -r * 0.18f), b + Offset(0f, r * 0.04f), r * 0.1f, StrokeCap.Round)
+        drawCircle(Color.White, r * 0.06f, b + Offset(0f, r * 0.17f))
+    }
 }
 
 private fun DrawScope.car(c: Offset, angle: Float) {
@@ -133,6 +140,6 @@ private fun DrawScope.car(c: Offset, angle: Float) {
     }
 }
 
-fun eventColor(e: AheadEvent) = if (e.kind == io.infotive.anulleong.care.EventKind.PAST_SICK) C.lilac else sevColor(e.severity)
+fun eventColor(e: AheadEvent) = if (e.kind == io.infotive.anulleong.care.EventKind.PAST_SICK) C.lilacDeep else sevColor(e.severity)
 
 fun sevColor(s: Severity) = when (s) { Severity.STRONG -> C.berry; Severity.NOTICE -> C.sun; Severity.GENTLE -> C.periwinkle }
